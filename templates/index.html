@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRE 监控仪表板</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 16px 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .title-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .title-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.disconnected {
+            background: #ef4444;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .time-range-selector {
+            display: flex;
+            background: #334155;
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .time-btn {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .time-btn:hover {
+            color: #e2e8f0;
+            background: #475569;
+        }
+
+        .time-btn.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+        }
+
+        .alert-banner {
+            background: linear-gradient(135deg, #dc2626 0%, #ea580c 100%);
+            padding: 12px 24px;
+            display: none;
+        }
+
+        .alert-banner.visible {
+            display: block;
+        }
+
+        .alert-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .alert-count {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .alert-badge {
+            background: white;
+            color: #dc2626;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .main-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .services-grid {
+            display: grid;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .service-card {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #334155;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #334155;
+        }
+
+        .service-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .service-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .service-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        .health-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .health-status.healthy {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+        }
+
+        .health-status.warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+        }
+
+        .health-status.critical {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+
+        .health-status.degraded {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 16px;
+        }
+
+        .metric-card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #334155;
+        }
+
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .metric-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .metric-current {
+            font-size: 28px;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        .metric-unit {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .metric-chart {
+            width: 100%;
+            height: 120px;
+        }
+
+        .alerts-section {
+            margin-top: 24px;
+        }
+
+        .alerts-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .alerts-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .alert-item {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 16px;
+            border-left: 4px solid;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .alert-item.critical {
+            border-left-color: #ef4444;
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.1) 0%, #1e293b 100%);
+        }
+
+        .alert-item.warn {
+            border-left-color: #f59e0b;
+            background: linear-gradient(90deg, rgba(245, 158, 11, 0.1) 0%, #1e293b 100%);
+        }
+
+        .alert-item.info {
+            border-left-color: #3b82f6;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, #1e293b 100%);
+        }
+
+        .alert-info {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .alert-level {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .alert-item.critical .alert-level {
+            background: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .alert-item.warn .alert-level {
+            background: rgba(245, 158, 11, 0.3);
+            color: #fcd34d;
+        }
+
+        .alert-item.info .alert-level {
+            background: rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+        }
+
+        .alert-metric {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 4px;
+        }
+
+        .alert-service {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+
+        .alert-message {
+            font-size: 14px;
+            color: #cbd5e1;
+        }
+
+        .alert-meta {
+            text-align: right;
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .alert-duration {
+            font-size: 18px;
+            font-weight: 700;
+            color: #f1f5f9;
+            margin-top: 4px;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #334155;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .title {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="title-section">
+                <div class="title-icon">📊</div>
+                <div>
+                    <div class="title">SRE 监控仪表板</div>
+                    <div class="connection-status">
+                        <span id="statusDot" class="status-dot"></span>
+                        <span id="statusText">实时连接中</span>
+                    </div>
+                </div>
+            </div>
+            <div class="controls">
+                <div class="time-range-selector">
+                    <button class="time-btn" data-range="5m">5 分钟</button>
+                    <button class="time-btn active" data-range="1h">1 小时</button>
+                    <button class="time-btn" data-range="6h">6 小时</button>
+                    <button class="time-btn" data-range="24h">24 小时</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alertBanner" class="alert-banner">
+        <div class="alert-content">
+            <div class="alert-count">
+                <span>🚨</span>
+                <span>当前有</span>
+                <span id="criticalCount" class="alert-badge">0</span>
+                <span>个严重告警</span>
+                <span>和</span>
+                <span id="warningCount" class="alert-badge" style="background: #f59e0b; color: white;">0</span>
+                <span>个警告</span>
+            </div>
+            <button onclick="scrollToAlerts()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 16px; border-radius: 6px; cursor: pointer;">
+                查看详情
+            </button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div id="servicesContainer" class="services-grid">
+            <div class="no-data">
+                <div class="loading"></div>
+                <p style="margin-top: 12px;">正在加载监控数据...</p>
+            </div>
+        </div>
+
+        <div id="alertsSection" class="alerts-section">
+            <h2 class="alerts-title">
+                <span>🚨</span>
+                <span>当前告警</span>
+            </h2>
+            <div id="alertsList" class="alerts-list">
+                <div class="no-data">暂无告警</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const METRIC_CONFIGS = {
+            qps: { name: 'QPS', unit: 'req/s', color: '#3b82f6', type: 'gauge' },
+            p99_latency: { name: 'P99 延迟', unit: 'ms', color: '#8b5cf6', type: 'gauge' },
+            error_rate: { name: '错误率', unit: '%', color: '#ef4444', type: 'gauge' },
+            cpu_usage: { name: 'CPU 使用率', unit: '%', color: '#f59e0b', type: 'gauge' },
+            memory_usage: { name: '内存使用率', unit: '%', color: '#10b981', type: 'gauge' },
+            disk_usage: { name: '磁盘使用率', unit: '%', color: '#06b6d4', type: 'gauge' }
+        };
+
+        let currentRange = '1h';
+        let charts = {};
+        let services = {};
+        let eventSource = null;
+
+        function init() {
+            loadDashboardData();
+            initSSE();
+            setupTimeRangeButtons();
+        }
+
+        function setupTimeRangeButtons() {
+            document.querySelectorAll('.time-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentRange = btn.dataset.range;
+                    loadDashboardData();
+                });
+            });
+        }
+
+        async function loadDashboardData() {
+            try {
+                const response = await fetch('/api/dashboard/summary');
+                const data = await response.json();
+
+                if (data.firing_alerts > 0) {
+                    document.getElementById('alertBanner').classList.add('visible');
+                    document.getElementById('criticalCount').textContent = data.critical_alerts;
+                    document.getElementById('warningCount').textContent = data.warning_alerts;
+                } else {
+                    document.getElementById('alertBanner').classList.remove('visible');
+                }
+
+                renderServices(data.services);
+                loadAllMetricsHistory();
+                loadFiringAlerts();
+            } catch (error) {
+                console.error('Failed to load dashboard data:', error);
+            }
+        }
+
+        function renderServices(servicesData) {
+            const container = document.getElementById('servicesContainer');
+
+            if (!servicesData || servicesData.length === 0) {
+                container.innerHTML = `
+                    <div class="no-data">
+                        <p>暂无服务数据</p>
+                        <p style="font-size: 14px; color: #64748b; margin-top: 8px;">请先通过 API 推送指标数据</p>
+                    </div>
+                `;
+                return;
+            }
+
+            services = {};
+            servicesData.forEach(s => {
+                services[s.service.name] = s;
+            });
+
+            container.innerHTML = servicesData.map(serviceData => {
+                const service = serviceData.service;
+                const metrics = serviceData.metrics;
+
+                return `
+                    <div class="service-card" data-service="${service.name}">
+                        <div class="service-header">
+                            <div class="service-info">
+                                <div class="service-icon">🖥️</div>
+                                <div>
+                                    <div class="service-name">${service.name}</div>
+                                    <div style="font-size: 14px; color: #64748b;">最后更新: ${new Date().toLocaleTimeString()}</div>
+                                </div>
+                            </div>
+                            <div class="health-status ${service.health_status}">
+                                <span>${getStatusIcon(service.health_status)}</span>
+                                <span>${getStatusText(service.health_status)}</span>
+                            </div>
+                        </div>
+                        <div class="metrics-grid">
+                            ${Object.keys(METRIC_CONFIGS).map(metricKey => {
+                                const config = METRIC_CONFIGS[metricKey];
+                                const metricData = metrics[metricKey];
+                                const value = metricData && metricData.value !== null ?
+                                    metricData.value.toFixed(metricKey === 'error_rate' ? 2 : metricKey === 'qps' ? 0 : 1) : '-';
+
+                                return `
+                                    <div class="metric-card" data-metric="${metricKey}" data-service="${service.name}">
+                                        <div class="metric-header">
+                                            <span class="metric-name">${config.name}</span>
+                                            <div class="metric-value">
+                                                <span class="metric-current" id="value-${service.name}-${metricKey}">${value}</span>
+                                                <span class="metric-unit">${config.unit}</span>
+                                            </div>
+                                        </div>
+                                        <div id="chart-${service.name}-${metricKey}" class="metric-chart"></div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            servicesData.forEach(serviceData => {
+                Object.keys(METRIC_CONFIGS).forEach(metricKey => {
+                    initChart(serviceData.service.name, metricKey);
+                });
+            });
+        }
+
+        function getStatusIcon(status) {
+            const icons = {
+                healthy: '✅',
+                warning: '⚠️',
+                critical: '🔴',
+                degraded: '🔵'
+            };
+            return icons[status] || '❓';
+        }
+
+        function getStatusText(status) {
+            const texts = {
+                healthy: '运行正常',
+                warning: '告警中',
+                critical: '严重告警',
+                degraded: '性能下降'
+            };
+            return texts[status] || status;
+        }
+
+        function initChart(serviceName, metricKey) {
+            const chartDom = document.getElementById(`chart-${serviceName}-${metricKey}`);
+            if (!chartDom) return;
+
+            const config = METRIC_CONFIGS[metricKey];
+            const chart = echarts.init(chartDom, 'dark');
+
+            const option = {
+                grid: {
+                    left: 0,
+                    right: 0,
+                    top: 5,
+                    bottom: 5
+                },
+                xAxis: {
+                    type: 'category',
+                    show: false,
+                    data: []
+                },
+                yAxis: {
+                    type: 'value',
+                    show: false,
+                    min: metricKey === 'error_rate' || metricKey === 'cpu_usage' || metricKey === 'memory_usage' || metricKey === 'disk_usage' ? 0 : null,
+                    max: metricKey === 'error_rate' || metricKey === 'cpu_usage' || metricKey === 'memory_usage' || metricKey === 'disk_usage' ? 100 : null
+                },
+                series: [{
+                    type: 'line',
+                    data: [],
+                    smooth: true,
+                    showSymbol: false,
+                    lineStyle: {
+                        width: 2,
+                        color: config.color
+                    },
+                    areaStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0, y: 0, x2: 0, y2: 1,
+                            colorStops: [
+                                { offset: 0, color: config.color + '40' },
+                                { offset: 1, color: config.color + '05' }
+                            ]
+                        }
+                    }
+                }]
+            };
+
+            chart.setOption(option);
+            charts[`${serviceName}-${metricKey}`] = chart;
+
+            window.addEventListener('resize', () => {
+                chart.resize();
+            });
+        }
+
+        async function loadAllMetricsHistory() {
+            for (const serviceName of Object.keys(services)) {
+                for (const metricKey of Object.keys(METRIC_CONFIGS)) {
+                    loadMetricHistory(serviceName, metricKey);
+                }
+            }
+        }
+
+        async function loadMetricHistory(serviceName, metricKey) {
+            try {
+                const response = await fetch(
+                    `/api/metrics/query?metric=${metricKey}&service=${serviceName}&range=${currentRange}`
+                );
+                const data = await response.json();
+
+                if (data.data && charts[`${serviceName}-${metricKey}`]) {
+                    const chart = charts[`${serviceName}-${metricKey}`];
+                    chart.setOption({
+                        xAxis: { data: data.data.x },
+                        series: [{ data: data.data.y }]
+                    });
+                }
+            } catch (error) {
+                console.error(`Failed to load metric ${metricKey} for ${serviceName}:`, error);
+            }
+        }
+
+        async function loadFiringAlerts() {
+            try {
+                const response = await fetch('/api/alerts/firing');
+                const data = await response.json();
+                renderAlerts(data.alerts);
+            } catch (error) {
+                console.error('Failed to load firing alerts:', error);
+            }
+        }
+
+        function renderAlerts(alerts) {
+            const container = document.getElementById('alertsList');
+
+            if (!alerts || alerts.length === 0) {
+                container.innerHTML = '<div class="no-data">暂无告警</div>';
+                return;
+            }
+
+            container.innerHTML = alerts.map(alert => {
+                const startedAt = alert.started_at ? new Date(alert.started_at) : new Date();
+                const duration = Math.floor((Date.now() - startedAt.getTime()) / 1000);
+
+                return `
+                    <div class="alert-item ${alert.level}">
+                        <div class="alert-info">
+                            <span class="alert-level">${alert.level}</span>
+                            <div class="alert-metric">${alert.metric_name}</div>
+                            <div class="alert-service">服务: ${alert.service_name}</div>
+                            <div class="alert-message">${alert.message}</div>
+                        </div>
+                        <div class="alert-meta">
+                            <div>持续时间</div>
+                            <div class="alert-duration">${formatDuration(duration)}</div>
+                            <div style="margin-top: 8px;">${alert.current_value} / ${alert.threshold_value}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function formatDuration(seconds) {
+            if (seconds < 60) return `${seconds}s`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+            return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+        }
+
+        function scrollToAlerts() {
+            document.getElementById('alertsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function initSSE() {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            eventSource = new EventSource('/api/stream');
+
+            eventSource.onopen = () => {
+                document.getElementById('statusDot').classList.remove('disconnected');
+                document.getElementById('statusText').textContent = '实时连接中';
+            };
+
+            eventSource.onerror = () => {
+                document.getElementById('statusDot').classList.add('disconnected');
+                document.getElementById('statusText').textContent = '连接断开，正在重连...';
+            };
+
+            eventSource.addEventListener('message', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleSSEData(data);
+                } catch (error) {
+                    console.error('Failed to parse SSE data:', error);
+                }
+            });
+        }
+
+        function handleSSEData(data) {
+            for (const [key, value] of Object.entries(data)) {
+                if (key === '_alerts') {
+                    renderAlerts(value);
+                    updateAlertBanner(value);
+                } else {
+                    updateMetricValue(value);
+                    updateChartPoint(value);
+                }
+            }
+        }
+
+        function updateAlertBanner(alerts) {
+            const critical = alerts.filter(a => a.level === 'critical').length;
+            const warning = alerts.filter(a => a.level === 'warn').length;
+
+            if (critical > 0 || warning > 0) {
+                document.getElementById('alertBanner').classList.add('visible');
+                document.getElementById('criticalCount').textContent = critical;
+                document.getElementById('warningCount').textContent = warning;
+            } else {
+                document.getElementById('alertBanner').classList.remove('visible');
+            }
+        }
+
+        function updateMetricValue(metricData) {
+            const valueEl = document.getElementById(`value-${metricData.service_name}-${metricData.metric_name}`);
+            if (valueEl) {
+                const metricKey = metricData.metric_name;
+                const fixed = metricKey === 'error_rate' ? 2 : metricKey === 'qps' ? 0 : 1;
+                valueEl.textContent = metricData.value.toFixed(fixed);
+            }
+        }
+
+        function updateChartPoint(metricData) {
+            const chartKey = `${metricData.service_name}-${metricData.metric_name}`;
+            const chart = charts[chartKey];
+            if (!chart) return;
+
+            const option = chart.getOption();
+            const xData = option.xAxis[0].data || [];
+            const yData = option.series[0].data || [];
+
+            const timestamp = new Date(metricData.timestamp).toLocaleString();
+            xData.push(timestamp);
+            yData.push(metricData.value);
+
+            const maxPoints = 60;
+            if (xData.length > maxPoints) {
+                xData.shift();
+                yData.shift();
+            }
+
+            chart.setOption({
+                xAxis: { data: xData },
+                series: [{ data: yData }]
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
