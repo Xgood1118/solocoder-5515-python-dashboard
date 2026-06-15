@@ -140,13 +140,17 @@ class Alert(db.Model):
 
     __table_args__ = (db.Index('idx_metric_state_level', 'metric_id', 'state', 'level'),)
 
+    metric = db.relationship('Metric', foreign_keys=[metric_id], backref='alerts', lazy='joined')
+
     def to_dict(self):
+        metric_obj = getattr(self, 'metric', None)
+        service_obj = getattr(self, 'service', None)
         return {
             'id': self.id,
             'metric_id': self.metric_id,
             'service_id': self.service_id,
-            'metric_name': self.metric.name if self.metric else '',
-            'service_name': self.service.name if self.service else '',
+            'metric_name': metric_obj.name if metric_obj else '',
+            'service_name': service_obj.name if service_obj else '',
             'state': self.state,
             'level': self.level,
             'current_value': self.current_value,
